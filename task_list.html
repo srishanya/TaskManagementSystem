@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>My Tasks</h2>
+</div>
+
+<div class="card mb-4 border-0 shadow-sm">
+    <div class="card-body">
+        <form method="get" class="row g-3">
+            <div class="col-md-4">
+                <input type="text" name="q" class="form-control" placeholder="Search tasks..." value="{{ request.GET.q }}">
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select">
+                    <option value="">All Statuses</option>
+                    <option value="TODO" {% if request.GET.status == 'TODO' %}selected{% endif %}>To Do</option>
+                    <option value="IN_PROGRESS" {% if request.GET.status == 'IN_PROGRESS' %}selected{% endif %}>In Progress</option>
+                    <option value="REVIEW" {% if request.GET.status == 'REVIEW' %}selected{% endif %}>Review</option>
+                    <option value="DONE" {% if request.GET.status == 'DONE' %}selected{% endif %}>Done</option>
+                    <option value="BLOCKED" {% if request.GET.status == 'BLOCKED' %}selected{% endif %}>Blocked</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="priority" class="form-select">
+                    <option value="">All Priorities</option>
+                    <option value="LOW" {% if request.GET.priority == 'LOW' %}selected{% endif %}>Low</option>
+                    <option value="MEDIUM" {% if request.GET.priority == 'MEDIUM' %}selected{% endif %}>Medium</option>
+                    <option value="HIGH" {% if request.GET.priority == 'HIGH' %}selected{% endif %}>High</option>
+                    <option value="CRITICAL" {% if request.GET.priority == 'CRITICAL' %}selected{% endif %}>Critical</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Title</th>
+                        <th>Project</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                        <th>Due Date</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for task in tasks %}
+                    <tr>
+                        <td class="ps-4 fw-500">{{ task.title }}</td>
+                        <td><a href="{% url 'projects:project_detail' task.project.pk %}" class="text-decoration-none">{{ task.project.name }}</a></td>
+                        <td><span class="badge bg-{{ task.status|lower }}">{{ task.get_status_display }}</span></td>
+                        <td>
+                            <span class="badge {% if task.priority == 'HIGH' or task.priority == 'CRITICAL' %}bg-danger{% elif task.priority == 'MEDIUM' %}bg-warning text-dark{% else %}bg-info{% endif %}">
+                                {{ task.get_priority_display }}
+                            </span>
+                        </td>
+                        <td class="text-muted">{{ task.due_date|default:"-" }}</td>
+                        <td class="text-end pe-4">
+                            <a href="{% url 'tasks:task_update' task.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">You have no tasks assigned.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<style>
+    .bg-todo { background-color: #6c757d; color: white;}
+    .bg-in_progress { background-color: #0d6efd; color: white;}
+    .bg-review { background-color: #fd7e14; color: white;}
+    .bg-done { background-color: #198754; color: white;}
+    .bg-blocked { background-color: #dc3545; color: white;}
+    .fw-500 { font-weight: 500; }
+</style>
+{% endblock %}

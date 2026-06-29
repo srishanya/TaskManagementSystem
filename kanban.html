@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><a href="{% url 'projects:project_detail' project.pk %}" class="text-decoration-none text-dark">{{ project.name }}</a> / Kanban Board</h2>
+    <a href="{% url 'tasks:task_create' %}?project={{ project.pk }}" class="btn btn-primary">Add Task</a>
+</div>
+
+<div class="row kanban-board g-3">
+    <!-- To Do -->
+    <div class="col">
+        <div class="kanban-column bg-light p-3 rounded shadow-sm h-100" data-status="TODO">
+            <h5 class="text-secondary text-uppercase mb-3"><i class="bi bi-circle"></i> To Do</h5>
+            <div class="kanban-tasks" style="min-height: 50vh;">
+                {% for task in kanban_data.TODO %}
+                    {% include "tasks/partials/kanban_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- In Progress -->
+    <div class="col">
+        <div class="kanban-column bg-light p-3 rounded shadow-sm h-100" data-status="IN_PROGRESS">
+            <h5 class="text-primary text-uppercase mb-3"><i class="bi bi-play-circle"></i> In Progress</h5>
+            <div class="kanban-tasks" style="min-height: 50vh;">
+                {% for task in kanban_data.IN_PROGRESS %}
+                    {% include "tasks/partials/kanban_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Review -->
+    <div class="col">
+        <div class="kanban-column bg-light p-3 rounded shadow-sm h-100" data-status="REVIEW">
+            <h5 class="text-warning text-uppercase mb-3"><i class="bi bi-eye"></i> Review</h5>
+            <div class="kanban-tasks" style="min-height: 50vh;">
+                {% for task in kanban_data.REVIEW %}
+                    {% include "tasks/partials/kanban_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Done -->
+    <div class="col">
+        <div class="kanban-column bg-light p-3 rounded shadow-sm h-100" data-status="DONE">
+            <h5 class="text-success text-uppercase mb-3"><i class="bi bi-check-circle"></i> Done</h5>
+            <div class="kanban-tasks" style="min-height: 50vh;">
+                {% for task in kanban_data.DONE %}
+                    {% include "tasks/partials/kanban_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Blocked -->
+    <div class="col">
+        <div class="kanban-column bg-light p-3 rounded shadow-sm h-100" data-status="BLOCKED">
+            <h5 class="text-danger text-uppercase mb-3"><i class="bi bi-x-circle"></i> Blocked</h5>
+            <div class="kanban-tasks" style="min-height: 50vh;">
+                {% for task in kanban_data.BLOCKED %}
+                    {% include "tasks/partials/kanban_card.html" %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+<script>
+function getCookie(name) {
+    let cookieValue = null;
+    if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';');
+        for (let i = 0; i < cookies.length; i++) {
+            const cookie = cookies[i].trim();
+            if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                break;
+            }
+        }
+    }
+    return cookieValue;
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+    const columns = document.querySelectorAll('.kanban-tasks');
+    const csrftoken = getCookie('csrftoken');
+    
+    columns.forEach(col => {
+        new Sortable(col, {
+            group: 'kanban',
+            animation: 150,
+            ghostClass: 'bg-info',
+            onEnd: function(evt) {
+                const itemEl = evt.item;
+                const newStatus = evt.to.closest('.kanban-column').dataset.status;
+                const taskId = itemEl.dataset.taskId;
+                
+                // Only send request if status actually changed
+                if (evt.from !== evt.to) {
+                    fetch('{% url "tasks:update_task_status" %}', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'X-CSRFToken': csrftoken
+                        },
+                        body: JSON.stringify({
+                            task_id: taskId,
+                            status: newStatus
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        if(!data.success) {
+                            alert('Failed to update task status: ' + (data.error || 'Unknown error'));
+                            // Revert the DOM change
+                            evt.from.insertBefore(itemEl, evt.from.children[evt.oldIndex]);
+                        }
+                    })
+                    .catch(err => {
+                        alert('Error updating task.');
+                        evt.from.insertBefore(itemEl, evt.from.children[evt.oldIndex]);
+                    });
+                }
+            }
+        });
+    });
+});
+</script>
+
+<style>
+    .kanban-board {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding-bottom: 20px;
+    }
+    .kanban-board .col {
+        min-width: 300px;
+    }
+    .task-card {
+        cursor: grab;
+        transition: transform 0.2s;
+    }
+    .task-card:active {
+        cursor: grabbing;
+    }
+    .task-card:hover {
+        transform: translateY(-2px);
+    }
+</style>
+{% endblock %}

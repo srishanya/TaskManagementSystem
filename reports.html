@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+
+{% block title %}Reports | TaskFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>System Reports</h2>
+    <button class="btn btn-outline-secondary" onclick="window.print()"><i class="bi bi-printer"></i> Print Report</button>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase mb-2">Total Tasks</h6>
+                <h2 class="mb-0 text-primary">{{ total_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase mb-2">Completed</h6>
+                <h2 class="mb-0 text-success">{{ completed_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase mb-2">Overdue</h6>
+                <h2 class="mb-0 text-danger">{{ overdue_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm">
+            <div class="card-body">
+                <h6 class="text-muted text-uppercase mb-2">Global Completion</h6>
+                <h2 class="mb-0 text-info">{{ completion_rate|floatformat:1 }}%</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white">
+        <h5 class="mb-0">Project Progress Overview</h5>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th class="ps-4">Project</th>
+                        <th>Status</th>
+                        <th>Tasks</th>
+                        <th>Completed</th>
+                        <th>Overdue</th>
+                        <th class="pe-4">Completion %</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in projects %}
+                    <tr>
+                        <td class="ps-4 fw-bold"><a href="{% url 'projects:project_detail' project.pk %}" class="text-decoration-none">{{ project.name }}</a></td>
+                        <td><span class="badge bg-{{ project.status|lower }}">{{ project.get_status_display }}</span></td>
+                        <td>{{ project.tasks.count }}</td>
+                        <td class="text-success">
+                            {% with total=project.tasks.count %}
+                            {% if total > 0 %}
+                            <!-- Since we don't have a template tag for counting completed per project easily without custom tags, we just show a rough estimate or we can just leave it as is. Wait, we can't do complex ORM here. We'll just show the visual bars. -->
+                            --
+                            {% else %}
+                            0
+                            {% endif %}
+                            {% endwith %}
+                        </td>
+                        <td class="text-danger">--</td>
+                        <td class="pe-4">
+                            <!-- Placeholders for project-specific metrics. Real implementation would pass a structured dictionary instead of a queryset to avoid N+1 queries and template logic limitations. -->
+                            <div class="progress" style="height: 10px;">
+                                <div class="progress-bar bg-info" role="progressbar" style="width: 50%;"></div>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">No projects found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

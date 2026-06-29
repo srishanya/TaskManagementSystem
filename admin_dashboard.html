@@ -1,0 +1,85 @@
+{% extends 'base.html' %}
+
+{% block title %}Admin Dashboard | TaskFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Admin Dashboard</h2>
+    <a href="{% url 'projects:project_create' %}" class="btn btn-primary">Create Project</a>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm bg-primary text-white">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-2">Total Users</h6>
+                <h2 class="mb-0">{{ total_users }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm bg-success text-white">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-2">Active Projects</h6>
+                <h2 class="mb-0">{{ active_projects }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm bg-info text-white">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-2">Completed Projects</h6>
+                <h2 class="mb-0">{{ completed_projects }}</h2>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center h-100 border-0 shadow-sm bg-secondary text-white">
+            <div class="card-body">
+                <h6 class="text-uppercase mb-2">Total Tasks</h6>
+                <h2 class="mb-0">{{ total_tasks }}</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Recent Projects</h5>
+                <a href="{% url 'projects:project_list' %}" class="btn btn-sm btn-outline-secondary">View All</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for project in recent_projects %}
+                    <a href="{% url 'projects:project_detail' project.pk %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="mb-1">{{ project.name }}</h6>
+                            <small class="text-muted">Created {{ project.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        <span class="badge bg-{{ project.status|lower }}">{{ project.get_status_display }}</span>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item text-muted">No projects found.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Quick Actions</h5>
+            </div>
+            <div class="card-body">
+                <div class="d-grid gap-2">
+                    <a href="{% url 'core:reports' %}" class="btn btn-outline-primary"><i class="bi bi-graph-up"></i> System Reports</a>
+                    <a href="/admin/users/user/" class="btn btn-outline-secondary"><i class="bi bi-people"></i> Manage Users</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

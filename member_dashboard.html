@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}My Dashboard | TaskFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Welcome back, {{ user.first_name|default:user.username }}!</h2>
+    <a href="{% url 'tasks:task_list' %}" class="btn btn-outline-primary">View All My Tasks</a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card shadow-sm border-0 mb-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">My Active Tasks</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for task in assigned_tasks %}
+                    <a href="{% url 'tasks:task_detail' task.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-truncate" style="max-width: 70%;">{{ task.title }}</h6>
+                            <span class="badge bg-{{ task.status|lower }}">{{ task.get_status_display }}</span>
+                        </div>
+                        <small class="text-muted">{{ task.project.name }} &bull; Due: {{ task.due_date|default:"None" }}</small>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item text-center py-4 text-muted">
+                        <i class="bi bi-emoji-smile fs-3 d-block mb-2 text-success"></i>
+                        You have no active tasks. Good job!
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 border-start border-warning border-4">
+            <div class="card-header bg-white">
+                <h5 class="mb-0 text-warning"><i class="bi bi-clock-history"></i> Upcoming Deadlines (Next 7 Days)</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="list-group list-group-flush">
+                    {% for task in upcoming_deadlines %}
+                    <a href="{% url 'tasks:task_detail' task.pk %}" class="list-group-item list-group-item-action">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1 text-truncate" style="max-width: 70%;">{{ task.title }}</h6>
+                            <small class="text-danger fw-bold">{{ task.due_date|timeuntil }}</small>
+                        </div>
+                        <small class="text-muted">{{ task.project.name }}</small>
+                    </a>
+                    {% empty %}
+                    <div class="list-group-item text-muted text-center py-3">No immediate deadlines.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white">
+                <h5 class="mb-0">Recent Activity</h5>
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for log in recent_activities %}
+                    <li class="list-group-item text-sm py-3">
+                        <small class="text-muted d-block mb-1">{{ log.timestamp|timesince }} ago in {{ log.project.name }}</small>
+                        <span class="fw-bold">{{ log.get_action_display|lower }}</span>: {{ log.description }}
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-muted text-center py-3">No recent activity.</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

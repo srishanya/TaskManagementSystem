@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+
+{% block title %}Gantt Chart - {{ project.name }} | TaskFlow{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Gantt Chart: {{ project.name }}</h2>
+    <a href="{% url 'projects:project_detail' project.pk %}" class="btn btn-outline-secondary">Back to Project</a>
+</div>
+
+<div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+        <div class="d-flex justify-content-end mb-3">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn btn-outline-primary active" id="view-Day">Day</button>
+                <button type="button" class="btn btn-outline-primary" id="view-Week">Week</button>
+                <button type="button" class="btn btn-outline-primary" id="view-Month">Month</button>
+            </div>
+        </div>
+        
+        <div id="gantt"></div>
+        <p class="text-muted mt-3 mb-0" id="gantt-empty-state" style="display: none;">No tasks with start and due dates found for this project.</p>
+    </div>
+</div>
+
+<!-- Frappe Gantt CSS -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.css" />
+
+<style>
+    /* Custom styling for Frappe Gantt to match our theme */
+    .gantt .bar-wrapper.status-todo .bar { fill: #6c757d; }
+    .gantt .bar-wrapper.status-in_progress .bar { fill: #0d6efd; }
+    .gantt .bar-wrapper.status-review .bar { fill: #fd7e14; }
+    .gantt .bar-wrapper.status-done .bar { fill: #198754; }
+    .gantt .bar-wrapper.status-blocked .bar { fill: #dc3545; }
+    .gantt .bar-wrapper:hover .bar { filter: brightness(0.9); }
+</style>
+
+<!-- Frappe Gantt JS -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/frappe-gantt/0.6.1/frappe-gantt.min.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const tasks = JSON.parse('{{ gantt_tasks_json|escapejs }}');
+        
+        if (tasks.length === 0) {
+            document.getElementById('gantt-empty-state').style.display = 'block';
+            return;
+        }
+
+        const gantt = new Gantt("#gantt", tasks, {
+            header_height: 50,
+            column_width: 30,
+            step: 24,
+            view_modes: ['Quarter Day', 'Half Day', 'Day', 'Week', 'Month'],
+            bar_height: 20,
+            bar_corner_radius: 3,
+            arrow_curve: 5,
+            padding: 18,
+            view_mode: 'Day',
+            date_format: 'YYYY-MM-DD',
+            custom_popup_html: function(task) {
+                return `
+                    <div class="details-container p-3 bg-white border rounded shadow-sm">
+                        <h6 class="mb-1">${task.name}</h6>
+                        <p class="mb-1 text-muted small">Start: ${task.start}</p>
+                        <p class="mb-0 text-muted small">End: ${task.end}</p>
+                        <p class="mb-0 text-muted small">Progress: ${task.progress}%</p>
+                    </div>
+                `;
+            }
+        });
+
+        // View mode switching
+        document.getElementById('view-Day').addEventListener('click', function() {
+            gantt.change_view_mode('Day');
+            updateActiveButton(this);
+        });
+        document.getElementById('view-Week').addEventListener('click', function() {
+            gantt.change_view_mode('Week');
+            updateActiveButton(this);
+        });
+        document.getElementById('view-Month').addEventListener('click', function() {
+            gantt.change_view_mode('Month');
+            updateActiveButton(this);
+        });
+
+        function updateActiveButton(activeBtn) {
+            document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+            activeBtn.classList.add('active');
+        }
+    });
+</script>
+{% endblock %}

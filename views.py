@@ -1,111 +1,133 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .models import Project, ProjectMember, Sprint
+from .forms import ProjectForm, ProjectMemberForm, SprintForm
+
 from django.db.models import Q
-from django.utils import timezone
-from projects.models import Project, Sprint
-from tasks.models import Task
-from users.models import User
-import datetime
 
 @login_required
-def dashboard_view(request):
-    user = request.user
-    
-    if user.is_admin:
-        # Admin Dashboard data
-        total_users = User.objects.count()
-        active_projects = Project.objects.filter(status='ACTIVE').count()
-        completed_projects = Project.objects.filter(status='COMPLETED').count()
-        total_tasks = Task.objects.count()
-        
-        context = {
-            'total_users': total_users,
-            'active_projects': active_projects,
-            'completed_projects': completed_projects,
-            'total_tasks': total_tasks,
-            'recent_projects': Project.objects.order_by('-created_at')[:5],
-        }
-        return render(request, 'core/admin_dashboard.html', context)
-        
-    elif user.is_manager:
-        # Manager Dashboard data
-        projects = Project.objects.filter(members__user=user)
-        active_tasks = Task.objects.filter(project__in=projects).exclude(status='DONE').count()
-        active_sprints = Sprint.objects.filter(project__in=projects, is_active=True).count()
-        
-        deadline_alerts = Task.objects.filter(
-            project__in=projects, 
-            status__in=['TODO', 'IN_PROGRESS', 'REVIEW'],
-            due_date__lte=timezone.now().date() + datetime.timedelta(days=3)
-        ).order_by('due_date')[:5]
-        
-        context = {
-            'projects': projects[:5],
-            'active_tasks': active_tasks,
-            'active_sprints': active_sprints,
-            'deadline_alerts': deadline_alerts,
-        }
-        return render(request, 'core/manager_dashboard.html', context)
-        
+def project_list(request):
+    if request.user.is_admin or request.user.is_manager:
+        projects = Project.objects.all().order_by('-created_at')
     else:
-        # Member Dashboard data
-        assigned_tasks = Task.objects.filter(assignee=user).exclude(status='DONE')
-        upcoming_deadlines = assigned_tasks.filter(
-            due_date__lte=timezone.now().date() + datetime.timedelta(days=7)
-        ).order_by('due_date')[:5]
-        recent_activities = user.activity_logs.order_by('-timestamp')[:10]
+        projects = Project.objects.filter(members__user=request.user).order_by('-created_at')
         
-        context = {
-            'assigned_tasks': assigned_tasks[:5],
-            'upcoming_deadlines': upcoming_deadlines,
-            'recent_activities': recent_activities,
-        }
-        return render(request, 'core/member_dashboard.html', context)
-
-@login_required
-def global_search(request):
-    q = request.GET.get('q', '')
-    projects = []
-    tasks = []
-    users = []
-    
+    q = request.GET.get('q')
     if q:
-        projects = Project.objects.filter(Q(name__icontains=q) | Q(description__icontains=q))
-        tasks = Task.objects.filter(Q(title__icontains=q) | Q(description__icontains=q))
-        users = User.objects.filter(Q(username__icontains=q) | Q(first_name__icontains=q) | Q(last_name__icontains=q))
+        projects = projects.filter(Q(name__icontains=q) | Q(description__icontains=q))
         
-        # Filter based on user role to avoid leaking data
-        if not (request.user.is_admin or request.user.is_manager):
-            projects = projects.filter(members__user=request.user)
-            tasks = tasks.filter(project__members__user=request.user)
-            
-    context = {
-        'q': q,
-        'projects': projects,
-        'tasks': tasks,
-        'users': users
-    }
-    return render(request, 'core/global_search.html', context)
+    return render(request, 'projects/project_list.html', {'projects': projects})
 
 @login_required
-def reports_view(request):
-    from django.http import HttpResponseForbidden
-    if not (request.user.is_admin or request.user.is_manager):
-        return HttpResponseForbidden("You don't have permission to access reports.")
-        
-    projects = Project.objects.all() if request.user.is_admin else Project.objects.filter(members__user=request.user)
+def project_detail(request, pk):
+    project = get_object_or_404(Project, pk=pk)
     
-    total_tasks = Task.objects.filter(project__in=projects).count()
-    completed_tasks = Task.objects.filter(project__in=projects, status='DONE').count()
-    overdue_tasks = Task.objects.filter(project__in=projects, due_date__lt=timezone.now().date()).exclude(status='DONE').count()
-    
-    completion_rate = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
-    
-    context = {
-        'projects': projects,
+    # Check access
+    if not (request.user.is_admin or request.user.is_manager or project.members.filter(user=request.user).exists()):
+        messages.error(request, "You don't have access to this project.")
+        return redirect('projects:project_list')
+
+    members = project.members.select_related('user').all()
+    tasks = project.tasks.all() # We will use this later
+
+    # Calculate dashboard metrics
+    total_tasks = tasks.count()
+    completed_tasks = tasks.filter(status='DONE').count()
+    pending_tasks = total_tasks - completed_tasks
+    completion_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+    return render(request, 'projects/project_detail.html', {
+        'project': project,
+        'members': members,
         'total_tasks': total_tasks,
         'completed_tasks': completed_tasks,
-        'overdue_tasks': overdue_tasks,
-        'completion_rate': completion_rate,
-    }
-    return render(request, 'core/reports.html', context)
+        'pending_tasks': pending_tasks,
+        'completion_percentage': completion_percentage
+    })
+
+@login_required
+def project_create(request):
+    if not (request.user.is_admin or request.user.is_manager):
+        messages.error(request, "Only Administrators and Project Managers can create projects.")
+        return redirect('projects:project_list')
+
+    if request.method == 'POST':
+        form = ProjectForm(request.POST)
+        if form.is_valid():
+            project = form.save()
+            # Add creator as ADMIN member
+            ProjectMember.objects.create(project=project, user=request.user, role='ADMIN')
+            messages.success(request, 'Project created successfully!')
+            return redirect('projects:project_detail', pk=project.pk)
+    else:
+        form = ProjectForm()
+    
+    return render(request, 'projects/project_form.html', {'form': form, 'action': 'Create'})
+
+@login_required
+def project_add_member(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    if not (request.user.is_admin or request.user.is_manager):
+        messages.error(request, "You don't have permission to add members.")
+        return redirect('projects:project_detail', pk=project.pk)
+
+    if request.method == 'POST':
+        form = ProjectMemberForm(request.POST)
+        if form.is_valid():
+            member = form.save(commit=False)
+            member.project = project
+            try:
+                member.save()
+                messages.success(request, 'Member added successfully!')
+                return redirect('projects:project_detail', pk=project.pk)
+            except Exception as e:
+                messages.error(request, 'This user is already a member of the project.')
+    else:
+        form = ProjectMemberForm()
+    
+    
+    return render(request, 'projects/project_member_form.html', {'form': form, 'project': project})
+
+@login_required
+def sprint_create(request, pk):
+    project = get_object_or_404(Project, pk=pk)
+    if not (request.user.is_admin or request.user.is_manager):
+        messages.error(request, "Only Administrators and Project Managers can create sprints.")
+        return redirect('projects:project_detail', pk=project.pk)
+
+    if request.method == 'POST':
+        form = SprintForm(request.POST)
+        if form.is_valid():
+            sprint = form.save(commit=False)
+            sprint.project = project
+            sprint.save()
+            messages.success(request, 'Sprint created successfully!')
+            return redirect('projects:project_detail', pk=project.pk)
+    else:
+        form = SprintForm()
+    
+    return render(request, 'projects/sprint_form.html', {'form': form, 'project': project})
+
+@login_required
+def sprint_detail(request, pk):
+    sprint = get_object_or_404(Sprint, pk=pk)
+    project = sprint.project
+    
+    if not (request.user.is_admin or request.user.is_manager or project.members.filter(user=request.user).exists()):
+        messages.error(request, "You don't have access to this sprint.")
+        return redirect('projects:project_list')
+
+    tasks = sprint.tasks.all()
+    total_tasks = tasks.count()
+    completed_tasks = tasks.filter(status='DONE').count()
+    completion_percentage = (completed_tasks / total_tasks * 100) if total_tasks > 0 else 0
+
+    return render(request, 'projects/sprint_detail.html', {
+        'sprint': sprint,
+        'project': project,
+        'tasks': tasks,
+        'total_tasks': total_tasks,
+        'completed_tasks': completed_tasks,
+        'completion_percentage': completion_percentage
+    })
